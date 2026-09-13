@@ -63,8 +63,7 @@ export abstract class List {
       userRole: this.list.userRole,
       hasCollaborators: this.list.hasCollaborators,
 
-      // Hide parentId as it is not relevant to the user
-      parentId: null,
+      parentId: this.list.parentId,
       // Hide whether the list is public or not.
       public: false,
     };
@@ -80,6 +79,62 @@ export abstract class List {
     } else {
       return new ManualList(ctx, data, collaboratorEntry);
     }
+  }
+
+  private static async findInheritedCollaborator(
+    ctx: AuthedContext,
+    listId: string,
+  ) {
+    const list = await ctx.db.query.bookmarkLists.findFirst({
+      columns: {
+        rssToken: false,
+      },
+      where: eq(bookmarkLists.id, listId),
+    });
+
+    if (!list?.parentId) {
+      return null;
+    }
+
+    const visitedListIds = new Set<string>();
+    let parentId: string | null = list.parentId;
+
+    while (parentId && !visitedListIds.has(parentId)) {
+      visitedListIds.add(parentId);
+
+      const collaborator = await ctx.db.query.listCollaborators.findFirst({
+        where: and(
+          eq(listCollaborators.listId, parentId),
+          eq(listCollaborators.userId, ctx.user.id),
+        ),
+      });
+
+      if (collaborator) {
+        return {
+          list,
+          collaborator,
+        };
+      }
+
+      const parentList:
+        | { id: string; parentId: string | null; userId: string }
+        | undefined = await ctx.db.query.bookmarkLists.findFirst({
+        columns: {
+          id: true,
+          parentId: true,
+          userId: true,
+        },
+        where: eq(bookmarkLists.id, parentId),
+      });
+
+      if (!parentList || parentList.userId !== list.userId) {
+        return null;
+      }
+
+      parentId = parentList.parentId;
+    }
+
+    return null;
   }
 
   static async fromId(
@@ -136,11 +191,30 @@ export abstract class List {
       if (collaborator) {
         list = {
           ...collaborator.list,
+          parentId: null,
           userRole: collaborator.role,
           hasCollaborators: true, // If you're a collaborator, the list has collaborators
         };
         collaboratorEntry = {
           membershipId: collaborator.id,
+        };
+      }
+    }
+
+    if (!list) {
+      const inheritedCollaborator = await this.findInheritedCollaborator(
+        ctx,
+        id,
+      );
+
+      if (inheritedCollaborator) {
+        list = {
+          ...inheritedCollaborator.list,
+          userRole: inheritedCollaborator.collaborator.role,
+          hasCollaborators: true,
+        };
+        collaboratorEntry = {
+          membershipId: inheritedCollaborator.collaborator.id,
         };
       }
     }
@@ -912,18 +986,104 @@ export abstract class List {
       },
     });
 
-    return collaborations.map((c) =>
-      this.fromData(
-        ctx,
-        {
-          ...c.list,
-          userRole: c.role,
-          hasCollaborators: true, // If you're a collaborator, the list has collaborators
-        },
-        {
-          membershipId: c.id,
-        },
-      ),
+    if (collaborations.length === 0) {
+      return [];
+    }
+
+    const ownerIds = [...new Set(collaborations.map((c) => c.list.userId))];
+    const ownerLists = await ctx.db.query.bookmarkLists.findMany({
+      columns: {
+        rssToken: false,
+      },
+      where: inArray(bookmarkLists.userId, ownerIds),
+    });
+
+    const listById = new Map(ownerLists.map((l) => [l.id, l]));
+    const childIdsByParentId = new Map<string, string[]>();
+
+    for (const list of ownerLists) {
+      if (!list.parentId) {
+        continue;
+      }
+
+      childIdsByParentId.set(list.parentId, [
+        ...(childIdsByParentId.get(list.parentId) ?? []),
+        list.id,
+      ]);
+    }
+
+    const directCollaborationByListId = new Map(
+      collaborations.map((c) => [c.listId, c]),
+    );
+    const roleRank = {
+      viewer: 0,
+      editor: 1,
+    };
+    const sharedListsById = new Map<
+      string,
+      {
+        list: (typeof ownerLists)[number];
+        role: (typeof collaborations)[number]["role"];
+        membershipId: string;
+      }
+    >();
+
+    for (const collaboration of collaborations) {
+      const queue = [collaboration.listId];
+      const visitedListIds = new Set<string>();
+
+      while (queue.length > 0) {
+        const currentListId = queue.shift();
+        if (!currentListId || visitedListIds.has(currentListId)) {
+          continue;
+        }
+
+        visitedListIds.add(currentListId);
+
+        const list = listById.get(currentListId);
+        if (!list) {
+          continue;
+        }
+
+        const directCollaboration = directCollaborationByListId.get(list.id);
+        const role = directCollaboration?.role ?? collaboration.role;
+        const membershipId = directCollaboration?.id ?? collaboration.id;
+        const existingSharedList = sharedListsById.get(list.id);
+
+        if (
+          !existingSharedList ||
+          roleRank[role] > roleRank[existingSharedList.role]
+        ) {
+          sharedListsById.set(list.id, {
+            list,
+            role,
+            membershipId,
+          });
+        }
+
+        queue.push(...(childIdsByParentId.get(list.id) ?? []));
+      }
+    }
+
+    const visibleListIds = new Set(sharedListsById.keys());
+
+    return Array.from(sharedListsById.values()).map(
+      ({ list, role, membershipId }) =>
+        this.fromData(
+          ctx,
+          {
+            ...list,
+            parentId:
+              list.parentId && visibleListIds.has(list.parentId)
+                ? list.parentId
+                : null,
+            userRole: role,
+            hasCollaborators: true,
+          },
+          {
+            membershipId,
+          },
+        ),
     );
   }
 

@@ -491,6 +491,44 @@ describe("Shared Lists", () => {
       expect(sharedLists[0].name).toBe("Shared List");
     });
 
+    test<CustomTestContext>("should show child lists of shared parent list", async ({
+      apiCallers,
+    }) => {
+      const ownerApi = apiCallers[0];
+      const collaboratorApi = apiCallers[1];
+
+      const parentList = await ownerApi.lists.create({
+        name: "Shared Parent List",
+        icon: "📚",
+        type: "manual",
+      });
+
+      const childList = await ownerApi.lists.create({
+        name: "Shared Child List",
+        icon: "📄",
+        type: "manual",
+        parentId: parentList.id,
+      });
+
+      await addAndAcceptCollaborator(
+        ownerApi,
+        collaboratorApi,
+        parentList.id,
+        "viewer",
+      );
+
+      const { lists: allLists } = await collaboratorApi.lists.list();
+
+      const sharedParent = allLists.find((l) => l.id === parentList.id);
+      const sharedChild = allLists.find((l) => l.id === childList.id);
+
+      expect(sharedParent).toBeDefined();
+      expect(sharedParent?.userRole).toBe("viewer");
+      expect(sharedChild).toBeDefined();
+      expect(sharedChild?.parentId).toBe(parentList.id);
+      expect(sharedChild?.userRole).toBe("viewer");
+    });
+
     test<CustomTestContext>("should allow collaborator to get list details", async ({
       apiCallers,
     }) => {
