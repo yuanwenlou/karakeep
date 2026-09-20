@@ -184,8 +184,11 @@ export function ManageCollaboratorsModal({
   return (
     <Dialog
       open={open}
-      onOpenChange={(s) => {
-        setOpen(s);
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          setIncludeSublists(true);
+        }
+        setOpen(nextOpen);
       }}
     >
       {children && <DialogTrigger asChild>{children}</DialogTrigger>}
@@ -256,24 +259,26 @@ export function ManageCollaboratorsModal({
                 </Button>
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/50 p-4">
-                <div className="space-y-1">
-                  <Label
-                    htmlFor="include-sublists"
-                    className="cursor-pointer text-sm font-medium"
-                  >
-                    {t("lists.collaborators.include_sublists")}
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    {t("lists.collaborators.include_sublists_description")}
-                  </p>
+              {list.type === "manual" && (
+                <div className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/50 p-4">
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="include-sublists"
+                      className="cursor-pointer text-sm font-medium"
+                    >
+                      {t("lists.collaborators.include_sublists")}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {t("lists.collaborators.include_sublists_description")}
+                    </p>
+                  </div>
+                  <Switch
+                    id="include-sublists"
+                    checked={includeSublists}
+                    onCheckedChange={setIncludeSublists}
+                  />
                 </div>
-                <Switch
-                  id="include-sublists"
-                  checked={includeSublists}
-                  onCheckedChange={setIncludeSublists}
-                />
-              </div>
+              )}
 
               <p className="text-xs text-muted-foreground">
                 <strong>{t("lists.collaborators.viewer")}:</strong>{" "}
