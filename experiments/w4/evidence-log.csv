@@ -1,0 +1,1 @@
+workflow_id,session_id,date,agent_role,objective,start_commit,end_commit,files_targeted,elapsed_minutes,token_usage,cost,commands_run,build_result,test_result,regressions,hallucinations,architecture_drift,human_corrections,integration_issues,status,key_lesson
