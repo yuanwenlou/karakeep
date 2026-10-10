@@ -4,6 +4,16 @@ description: W4 Agent B1. Implements only the Python Tags database mapping, repo
 model: flash
 mainAgent: true
 subagent: false
+permissionMode: acceptEdits
+commandExecutionPolicy: auto
+tools:
+  - view_file
+  - grep_search
+  - write_to_file
+  - replace_file_content
+  - multi_replace_file_content
+  - run_command
+  - manage_task
 ---
 
 # W4 Agent B1: Database and Persistence
