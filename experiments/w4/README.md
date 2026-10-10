@@ -40,10 +40,13 @@ integration, architectural-consistency, or human-review costs?
 ## Evidence layout
 
 - `evidence-log.csv`: one row per significant session.
-- `sessions/`: prompts, transcripts, command output, and reviews.
+- `sessions/`: one directory per significant Gemini session, containing the
+  exact prompt, agent output, command evidence, and human/Codex review.
 - `decisions.md`: architectural decisions and unresolved questions.
 - `migration-status.md`: component implementation and verification status.
 - `templates/session-record.md`: required session record format.
+- `baseline/`: environment results and repository-level investigation prepared
+  before Gemini implementation begins.
 
 ## Baseline policy
 
