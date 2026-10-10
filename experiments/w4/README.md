@@ -10,6 +10,22 @@
 - Primary execution agent: Gemini
 - Human role: coordinator, reviewer, and integration decision-maker
 
+## Agent responsibility boundary
+
+- Gemini is the **only agent that performs the measured rewrite experiment**:
+  it edits the Karakeep product code, carries out the TypeScript-to-Python
+  conversion, runs implementation-time verification, and produces the rewrite
+  commits whose time and token usage are evaluated.
+- Codex does **not** perform or substitute for the measured code conversion.
+  Its role is limited to pre-experiment repository investigation, preparing
+  prompts and evidence templates, reviewing Gemini's results, checking the
+  evidence supplied by Gemini, and helping synthesize the final report.
+- Environment-preparation and Codex coordination time/tokens must be recorded
+  separately and must not be presented as Gemini rewrite measurements.
+- If Codex discovers a possible implementation fix during review, it records
+  the finding and returns it to Gemini; Codex does not apply that product-code
+  fix as part of the experiment.
+
 ## Research question
 
 Can multiple specialised coding agents improve the overall efficiency of a
